@@ -9,8 +9,8 @@ module.exports = function(options) {
             return; // This should only be called once per request
         }
 
-        var etag = res.header('Etag');
-        var lastModified = res.header('Last-Modified');
+        var etag = res.get('Etag');
+        var lastModified = res.get('Last-Modified');
 
         // If an etag has already been set, trust it
         var hash = (etag || lastModified) ? null : crypto.createHash('md5');
@@ -44,10 +44,10 @@ module.exports = function(options) {
             }
             // If applicable, check for a lastmodifed match
             if (lastModified) {
-                console.log("Using last modified");
+                //console.log("Using last modified", res.get('Last-Modified'));
                 lastModified = new Date(lastModified);
-                var ifModSince = new Date(req.header('if-modified-since'));
-                if (req.header('if-modified-since') && lastModified <= ifModSince) {
+                var ifModSince = new Date(req.get('if-modified-since'));
+                if (req.get('if-modified-since') && lastModified <= ifModSince) {
                     return res.send('Cached', 304);
                 }
             }
@@ -58,18 +58,18 @@ module.exports = function(options) {
         res._autoEtagSet = true;
     };
     res.setEtag = function(etag) {
-        res.setHeader('Etag', etag);
+        res.set('Etag', etag);
         res.autoEtag();
-        if (etag && req.header("if-none-match") == etag) {
+        if (etag && req.get("if-none-match") == etag) {
             return false;
         } else {
             return true;
         }
     };
     res.setLastModifiedDate = function(date) {
-        res.setHeader('Last-Modified', date.toString());
+        res.set('Last-Modified', date.toString());
         res.autoEtag();
-        var ifModSince = new Date(req.header('if-modified-since'));
+        var ifModSince = new Date(req.get('if-modified-since'));
         if (ifModSince && date <= ifModSince) {
             return false;   // If this returns false you can short-circuit your code and just do res.end();
         } else {
