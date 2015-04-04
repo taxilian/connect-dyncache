@@ -4,8 +4,8 @@ NodeJS is connect middleware to make it easy to add [ETag](http://en.wikipedia.o
 resources to allow browsers to cache responses.
 
 ## Example
-    
-    var app = require('express').createServer();    
+
+    var app = require('express').createServer();
 
     app.use(require('connect-dyncache')());
 
@@ -40,23 +40,89 @@ have it generate an etag using an md5 hash of your page.  If you have some ident
 of the page you can set that using `res.setEtag(etag)`, and if you have a modified date that you can use you can set that with
 `res.setLastModifiedDate()`.
 
+# API
+
 ## `res.autoEtag()`
 
-Call this function to have the response object automatically calculate the md5 sum of your response and use that as the 
-ETag.  This is probably the easiest method to use.
+Call this function to have the response object automatically calculate the md5 sum of your response and use that as the
+ETag.  This is probably the easiest method to use. However, it should be noted, that this method does not help you pre-validate a request - your code below this will always run!
 
 ## `res.setEtag()`
 
 If you already have something that is a valid etag (something that will absolutely change if the document ever changes)
-then you can use it here in this call to setEtag. If the ETag provided by the page matches this one then this method will return false.
+then you can use it here in this call to setEtag. If the ETag provided by the page matches this one then this method will return `true`.
 If it does, you can stop processing and just call `res.end()`.
 
 ## `res.setLastModifiedDate(date)`
 
 If you know when the last time the current page was modified, such as if the core database table the page is generated from
 has a modified date on it, you can use that here either in place of or in addition to the ETag. If the client already has
-a cached copy of the page based on the date they provided, this method will return false.  If it does, you can stop processing
+a cached copy of the page based on the date they provided, this method will return `false`.  If it does, you can stop processing
 and just call `res.end()`.
+
+## `res.setExpires(date)`
+
+You can use this method to tell the browser when explicitly this will expire. Not all browsers take note of it, but some do - which is always a good reason to set it.
+
+## `res.setCacheControl(maxAge, more)`
+
+Set the `Cache-control` header, to tell the browser for how long exactly a file or content should be cached.
+This header is **ignored** if an ETag is present.
+
+Use the `more` parameter to add other stuff to this message. By default, this array contains: `["public"]`.
+
+## `res.watchFile(file)`
+
+Tell the engine to watch over a file. This generates an ETag and a Last-Modified line, and allows you to refer to a file, from which you take dynamic content. See the example for File-based dynamic content below.
+
+## `res.isWatching(file)`
+
+Test if this file is watched.
+
+## `res.unwatchFile(file)`
+
+Remove the file from the list of watched files.
+
+## `res.isChanged(file)`
+
+Look at what the browser sent (`If-not-modified` and `If-none-match`) and return accordingly:
+- `true`, if ETag matches and the file was not recently modified.
+- `false`, when the file is all okay.
+
+See the file-based dynamic content example below.
+
+# Some notes
+
+This extension **does not** serve files! This is ment to explicitly cache dynamic content.
+
+And here is an example. Imagine you are using [oj](https://github.com/musictheory/oj) to convert your OJ scripts to JavaScript, this might look like something you could do:
+
+```javascript
+app.use("/oj", function(req, res, next){
+    // Pick up the source file. Example: /oj/main.js -> /oj/main.oj
+    var file = ...;
+    if(res.isWatching(file)) res.watchFile(file);
+    if(res.isChanged(file)) {
+        // If the browser does not send the headers (aka. its new/changed),
+        // then generate the new content.
+        var contents = ojc(file);
+        fs.writeFile(myCacheDir+file, contents, function(err){
+            if(err) {...}
+            res.setHeader("Content-type", "text/javascript");
+            return res.end(contents);
+        });
+    } else {
+        // If the file is not changed, then...
+        res.status(304).end();
+    }
+});
+```
+
+In a personal example, I use this method to generate optimized versions of my image. By using the nice short syntax above, I save about 40 lines of code - and I counted them.
+
+If you have another cool example to show off, send a Pull Request with it!
+
+# More...
 
 ## see also...
 
@@ -83,4 +149,3 @@ I created this because I needed it; feel free to extend it with examples, fix bu
     groupies, guppies, puppies, or loss of sales.
 
     Use at your own risk.
-
